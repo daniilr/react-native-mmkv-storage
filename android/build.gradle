@@ -58,7 +58,7 @@ android {
     minSdkVersion getExtOrDefault('minSdkVersion', 16)
     targetSdkVersion getExtOrDefault('targetSdkVersion', 28)
     //ndkVersion "21.1.6352462"
-    
+
     externalNativeBuild {
       cmake {
         cppFlags "-fexceptions", "-frtti", "-std=c++1y", "-DONANDROID"
@@ -87,7 +87,7 @@ android {
   packagingOptions {
     excludes = ["**/libc++_shared.so","**/libjsi.so","**/libreactnativejni.so", "META-INF/MANIFEST.MF"]
   }
-  
+
   configurations {
     extractJNI
   }
@@ -96,7 +96,7 @@ android {
 repositories {
   mavenCentral()
   mavenLocal()
-  google()  
+  google()
 
   if (reactNativeDir.exists()) {
     maven {
@@ -112,12 +112,11 @@ repositories {
                     "Ensure you have you installed React Native as a dependency in your project and try again."
     )
   }
- 
 }
 
 dependencies {
   //noinspection GradleDynamicVersion
-  implementation 'com.facebook.react:react-native:+'
+  implementation "androidx.security:security-crypto:1.0.0"
   implementation "com.scottyab:secure-preferences-lib:0.1.4"
   implementation 'com.google.code.gson:gson:2.8.6'
 
@@ -126,7 +125,7 @@ dependencies {
 }
 
 task extractJNIFiles {
-  
+
   doLast {
     configurations.extractJNI.files.each {
       def file = it.absoluteFile
@@ -141,7 +140,7 @@ task extractJNIFiles {
 }
 
 task extractJNIFilesForRelease {
-  
+
   doLast {
     configurations.extractJNI.files.each {
       def file = it.absoluteFile

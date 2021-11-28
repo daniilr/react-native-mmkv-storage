@@ -8,7 +8,7 @@ public class Constants {
     public static final String KEYSTORE_PROVIDER_3 = "AndroidOpenSSL";
 
     public static final String RSA_ALGORITHM = "RSA/ECB/PKCS1Padding";
-    public static final String AES_ALGORITHM = "AES/ECB/PKCS5Padding";
+    public static final String AES_ALGORITHM = "AES/GCM/NoPadding";
 
     public static final String TAG = "RNSecureStorage";
 
@@ -16,6 +16,7 @@ public class Constants {
     public static final String SKS_KEY_FILENAME = "SKS_KEY_FILE";
     public static final String SKS_DATA_FILENAME = "SKS_DATA_FILE";
 
+    public static final String AES_IV_FILENAME = "__iv";
 
     public static final int DATA_TYPE_STRING = 1;
     public static final int DATA_TYPE_INT = 2;

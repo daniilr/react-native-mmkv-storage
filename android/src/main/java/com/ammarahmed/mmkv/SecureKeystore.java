@@ -8,13 +8,14 @@ import android.security.KeyPairGeneratorSpec;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKeys;
 
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.uimanager.IllegalViewOperationException;
-import com.securepreferences.SecurePreferences;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -25,6 +26,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -37,6 +39,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.x500.X500Principal;
+import javax.crypto.spec.IvParameterSpec;
 
 public class SecureKeystore {
 
@@ -53,7 +56,13 @@ public class SecureKeystore {
 
         reactContext = reactApplicationContext;
         if (!useKeystore()) {
-            prefs = new SecurePreferences(reactApplicationContext, (String) null, "e4b001df9a082298dd090bb7455c45d92fbd5ddd.xml");
+            prefs = EncryptedSharedPreferences.create(
+                "e4b001df9a082298dd090bb7455c45d92fbd5dda.xml",
+                MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+                reactContext,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
         }
     }
 
@@ -62,6 +71,19 @@ public class SecureKeystore {
         final int directionality = Character.getDirectionality(locale.getDisplayName().charAt(0));
         return directionality == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
                 directionality == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC;
+    }
+
+    private IvParameterSpec getIv(Context context) throws IOException {
+        byte[] iv;
+        if(Storage.exists(context, Constants.AES_IV_FILENAME)){
+            iv = Storage.readValues(context, Constants.AES_IV_FILENAME );
+        }
+        else {
+            iv = new byte[16];
+            new SecureRandom().nextBytes(iv);
+            Storage.writeValues(context, Constants.AES_IV_FILENAME, iv);
+        }
+        return new IvParameterSpec(iv);
     }
 
 
@@ -223,9 +245,9 @@ public class SecureKeystore {
         return encryptCipherText(cipher, plainTextBytes);
     }
 
-    private byte[] encryptAesPlainText(SecretKey secretKey, String plainText) throws GeneralSecurityException, IOException {
+    private byte[] encryptAesPlainText(SecretKey secretKey, IvParameterSpec iv, String plainText) throws GeneralSecurityException, IOException {
         Cipher cipher = Cipher.getInstance(Constants.AES_ALGORITHM);
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, iv);
         return encryptCipherText(cipher, plainText);
     }
 
@@ -262,7 +284,7 @@ public class SecureKeystore {
 
     public void setCipherText(Context context, String alias, String input) throws GeneralSecurityException, IOException {
         Storage.writeValues(context, Constants.SKS_DATA_FILENAME + alias,
-                encryptAesPlainText(getOrCreateSecretKey(context, alias), input));
+                encryptAesPlainText(getOrCreateSecretKey(context, alias), getIv(context), input));
     }
 
     private PrivateKey getPrivateKey(String alias) throws GeneralSecurityException, IOException {
@@ -277,9 +299,9 @@ public class SecureKeystore {
         return decryptCipherText(cipher, cipherTextBytes);
     }
 
-    private byte[] decryptAesCipherText(SecretKey secretKey, byte[] cipherTextBytes) throws GeneralSecurityException, IOException {
+    private byte[] decryptAesCipherText(SecretKey secretKey, IvParameterSpec iv, byte[] cipherTextBytes) throws GeneralSecurityException, IOException {
         Cipher cipher = Cipher.getInstance(Constants.AES_ALGORITHM);
-        cipher.init(Cipher.DECRYPT_MODE, secretKey);
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, iv);
         return decryptCipherText(cipher, cipherTextBytes);
     }
 
@@ -304,7 +326,7 @@ public class SecureKeystore {
     public String getPlainText(Context context, String alias) throws GeneralSecurityException, IOException {
         SecretKey secretKey = getSymmetricKey(context, alias);
         byte[] cipherTextBytes = Storage.readValues(context, Constants.SKS_DATA_FILENAME + alias);
-        return new String(decryptAesCipherText(secretKey, cipherTextBytes), "UTF-8");
+        return new String(decryptAesCipherText(secretKey, getIv(context), cipherTextBytes), "UTF-8");
     }
 
     public boolean exists(Context context, String alias) throws IOException {
